@@ -18,18 +18,19 @@ import (
 	emtTypes "github.com/tendermint/ethermint/types"
 )
 
+/*
+Ethermint struct
+- holds reference to an ethereum backend interface
+- listens to incoming ABCI messages and forwards them to the backend
+- has a strategy interface for what is a valid transaction in terms of price,
+  and how validators should be compensated
+*/
+
 // EthermintApplication implements an ABCI application
 type EthermintApplication struct {
 
-	// backend handles the ethereum state machine
-	// and wrangles other services started by an ethereum node (eg. tx pool)
-	backend *ethereum.Backend // backend ethereum struct
-
-	// a closure to return the latest current state from the ethereum blockchain
-	currentState func() (*state.StateDB, error)
-
-	// an ethereum rpc client we can forward queries to
-	rpcClient *rpc.Client
+	// backend handles all ethereum related services, such as blockchain and RPC
+	backend *ethereum.Backend
 
 	// strategy for validator compensation
 	strategy *emtTypes.Strategy
@@ -37,12 +38,10 @@ type EthermintApplication struct {
 
 // NewEthermintApplication creates the abci application for ethermint
 func NewEthermintApplication(backend *ethereum.Backend,
-	client *rpc.Client, strategy *emtTypes.Strategy) (*EthermintApplication, error) {
+	strategy *emtTypes.Strategy) (*EthermintApplication, error) {
 	app := &EthermintApplication{
-		backend:      backend,
-		rpcClient:    client,
-		currentState: backend.Ethereum().BlockChain().State,
-		strategy:     strategy,
+		backend:  backend,
+		strategy: strategy,
 	}
 
 	err := app.backend.ResetWork(app.Receiver()) // init the block results

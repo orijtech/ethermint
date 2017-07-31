@@ -20,6 +20,35 @@ import (
 	rpcClient "github.com/tendermint/tendermint/rpc/lib/client"
 )
 
+/*
+Backend interface
+- describes a set of functionality that all backends need to be able to deliver
+  and it doesn't care whether it is backed by parity or go-ethereum
+
+EthereumBackend struct implements Backend
+- starts only the blockchain, evm and rpc layer and nothing else
+# interface level
+- needs to listen to transactions created over geth-rpc
+- needs to forward those transactions to the tendermint rpc
+- needs to be able to communicate with the underlying ethereum blockchain and write transactions
+- needs to forward tendermint queries to the ethereum client
+- deliverTx takes an address to deposit the transaction fee too
+- needs to create new coins from scratch when received over IBC and destroy them when sending over IBC
+- ability to define the log level
+
+# private
+- needs to be configurable through a go-ethereum/parity config file
+  - homestead or not
+  - gas price
+  - gas limit
+- needs to disable PoW and only validate that transactions are correct state changes
+- needs to be able to credit transactions fees to validator accounts
+- shouldn't start the networking layer
+- shouldn't start mining
+- should only expose the correct RPC interfaces
+  - syncronization message should be fired by tendermint core in a regular basis
+*/
+
 //----------------------------------------------------------------------
 // Backend manages the underlying ethereum state for storage and processing,
 // and maintains the connection to Tendermint for forwarding txs

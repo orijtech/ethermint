@@ -12,6 +12,17 @@ import (
 	"github.com/tendermint/ethermint/version"
 )
 
+/*
+cmd
+- export --config to pass in a config file for ethereum
+- export --home to pass in the home directory for ethermint. Ethermint handles allocation of ethereum dir internally
+- export --help
+- export --log_level and proxy it to the ethereum instance
+- export "start" for "ethermint --home ... start"
+  - there is no init and a genesis file is read if there is no database from the --home dir
+- export "version"
+*/
+
 var (
 	// The app that holds all commands and flags.
 	app = ethUtils.NewApp(version.Version, "the ethermint command line interface")
