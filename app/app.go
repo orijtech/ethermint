@@ -1,21 +1,11 @@
 package app
 
 import (
-	"encoding/json"
-	"fmt"
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/state"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rpc"
-
-	abciTypes "github.com/tendermint/abci/types"
+	abci "github.com/tendermint/abci/types"
+	tmLog "github.com/tendermint/tmlibs/log"
 
 	"github.com/tendermint/ethermint/ethereum"
-	emtTypes "github.com/tendermint/ethermint/types"
+	"github.com/tendermint/ethermint/strategies"
 )
 
 /*
@@ -28,138 +18,157 @@ Ethermint struct
 
 // EthermintApplication implements an ABCI application
 type EthermintApplication struct {
-
 	// backend handles all ethereum related services, such as blockchain and RPC
 	backend *ethereum.Backend
 
 	// strategy for validator compensation
-	strategy *emtTypes.Strategy
+	strategy strategies.Strategy
+
+	logger tmLog.logger
 }
 
 // NewEthermintApplication creates the abci application for ethermint
 func NewEthermintApplication(backend *ethereum.Backend,
-	strategy *emtTypes.Strategy) (*EthermintApplication, error) {
+	strategy strategies.Strategy, logger tmLog.Logger) *EthermintApplication {
 	app := &EthermintApplication{
 		backend:  backend,
 		strategy: strategy,
+		logger:   logger,
 	}
 
-	err := app.backend.ResetWork(app.Receiver()) // init the block results
-	return app, err
+	//err := app.backend.ResetWork(app.Receiver()) // init the block results
+	return app
 }
 
 // Info returns information about the last height and app_hash to the tendermint engine
-func (app *EthermintApplication) Info() abciTypes.ResponseInfo {
-	log.Info("Info")
-	blockchain := app.backend.Ethereum().BlockChain()
-	currentBlock := blockchain.CurrentBlock()
-	height := currentBlock.Number()
-	hash := currentBlock.Hash()
+func (a *EthermintApplication) Info() abci.ResponseInfo {
+	/*
+		log.Info("Info")
+		blockchain := app.backend.Ethereum().BlockChain()
+		currentBlock := blockchain.CurrentBlock()
+		height := currentBlock.Number()
+		hash := currentBlock.Hash()
 
-	// This check determines whether it is the first time ethermint gets started.
-	// If it is the first time, then we have to respond with an empty hash, since
-	// that is what tendermint expects.
-	if height.Cmp(big.NewInt(0)) == 0 {
+		// This check determines whether it is the first time ethermint gets started.
+		// If it is the first time, then we have to respond with an empty hash, since
+		// that is what tendermint expects.
+		if height.Cmp(big.NewInt(0)) == 0 {
+			return abciTypes.ResponseInfo{
+				Data:             "ABCIEthereum",
+				LastBlockHeight:  height.Uint64(),
+				LastBlockAppHash: []byte{},
+			}
+		}
+
 		return abciTypes.ResponseInfo{
 			Data:             "ABCIEthereum",
 			LastBlockHeight:  height.Uint64(),
-			LastBlockAppHash: []byte{},
+			LastBlockAppHash: hash[:],
 		}
-	}
-
-	return abciTypes.ResponseInfo{
-		Data:             "ABCIEthereum",
-		LastBlockHeight:  height.Uint64(),
-		LastBlockAppHash: hash[:],
-	}
+	*/
 }
 
 // SetOption sets a configuration option
-func (app *EthermintApplication) SetOption(key string, value string) (log string) {
+// SetOption is used to set parameters such as gasprice that don't affect consensus
+func (a *EthermintApplication) SetOption(key string, value string) (log string) {
 	//log.Info("SetOption")
 	return ""
 }
 
 // InitChain initializes the validator set
-func (app *EthermintApplication) InitChain(validators []*abciTypes.Validator) {
-	log.Info("InitChain")
-	app.SetValidators(validators)
+func (a *EthermintApplication) InitChain(validators []*abci.Validator) {
+	//log.Info("InitChain")
+	//app.SetValidators(validators)
 }
 
 // CheckTx checks a transaction is valid but does not mutate the state
-func (app *EthermintApplication) CheckTx(txBytes []byte) abciTypes.Result {
-	tx, err := decodeTx(txBytes)
-	log.Info("Received CheckTx", "tx", tx)
-	if err != nil {
-		return abciTypes.ErrEncodingError.AppendLog(err.Error())
-	}
+func (a *EthermintApplication) CheckTx(txBytes []byte) abci.Result {
+	/*
+		tx, err := decodeTx(txBytes)
+		log.Info("Received CheckTx", "tx", tx)
+		if err != nil {
+			return abciTypes.ErrEncodingError.AppendLog(err.Error())
+		}
 
-	return app.validateTx(tx)
+		return app.validateTx(tx)
+	*/
+	return abci.OK
 }
 
 // DeliverTx executes a transaction against the latest state
-func (app *EthermintApplication) DeliverTx(txBytes []byte) abciTypes.Result {
-	tx, err := decodeTx(txBytes)
-	if err != nil {
-		return abciTypes.ErrEncodingError.AppendLog(err.Error())
-	}
+func (a *EthermintApplication) DeliverTx(txBytes []byte) abci.Result {
+	/*
+		tx, err := decodeTx(txBytes)
+		if err != nil {
+			return abciTypes.ErrEncodingError.AppendLog(err.Error())
+		}
 
-	log.Info("Got DeliverTx", "tx", tx)
-	err = app.backend.DeliverTx(tx)
-	if err != nil {
-		log.Warn("DeliverTx error", "err", err)
+		log.Info("Got DeliverTx", "tx", tx)
+		err = app.backend.DeliverTx(tx)
+		if err != nil {
+			log.Warn("DeliverTx error", "err", err)
 
-		return abciTypes.ErrInternalError.AppendLog(err.Error())
-	}
-	app.CollectTx(tx)
-
-	return abciTypes.OK
+			return abciTypes.ErrInternalError.AppendLog(err.Error())
+		}
+		app.CollectTx(tx)
+	*/
+	return abci.OK
 }
 
 // BeginBlock starts a new Ethereum block
-func (app *EthermintApplication) BeginBlock(hash []byte, tmHeader *abciTypes.Header) {
-	log.Info("BeginBlock")
-
-	// update the eth header with the tendermint header
-	app.backend.UpdateHeaderWithTimeInfo(tmHeader)
+func (a *EthermintApplication) BeginBlock(hash []byte, tmHeader *abci.Header) {
+	/*
+		// update the eth header with the tendermint header
+		app.backend.UpdateHeaderWithTimeInfo(tmHeader)
+	*/
 }
 
 // EndBlock accumulates rewards for the validators and updates them
-func (app *EthermintApplication) EndBlock(height uint64) abciTypes.ResponseEndBlock {
-	log.Info("EndBlock")
-	app.backend.AccumulateRewards(app.strategy)
-	return app.GetUpdatedValidators()
+func (a *EthermintApplication) EndBlock(height uint64) abci.ResponseEndBlock {
+	/*
+		log.Info("EndBlock")
+		app.backend.AccumulateRewards(app.strategy)
+		return app.GetUpdatedValidators()
+	*/
+	return abci.ResponseEndBlock{}
 }
 
 // Commit commits the block and returns a hash of the current state
-func (app *EthermintApplication) Commit() abciTypes.Result {
-	log.Info("Commit")
-	blockHash, err := app.backend.Commit(app.Receiver())
-	if err != nil {
-		log.Warn("Error getting latest ethereum state", "err", err)
-		return abciTypes.ErrInternalError.AppendLog(err.Error())
-	}
-	return abciTypes.NewResultOK(blockHash[:], "")
+func (a *EthermintApplication) Commit() abci.Result {
+	/*
+		log.Info("Commit")
+		blockHash, err := app.backend.Commit(app.Receiver())
+		if err != nil {
+			log.Warn("Error getting latest ethereum state", "err", err)
+			return abciTypes.ErrInternalError.AppendLog(err.Error())
+		}
+		return abciTypes.NewResultOK(blockHash[:], "")
+	*/
+	return abci.OK
 }
 
 // Query queries the state of EthermintApplication
-func (app *EthermintApplication) Query(query abciTypes.RequestQuery) abciTypes.ResponseQuery {
-	log.Info("Query")
-	var in jsonRequest
-	if err := json.Unmarshal(query.Data, &in); err != nil {
-		return abciTypes.ResponseQuery{Code: abciTypes.ErrEncodingError.Code, Log: err.Error()}
-	}
-	var result interface{}
-	if err := app.rpcClient.Call(&result, in.Method, in.Params...); err != nil {
-		return abciTypes.ResponseQuery{Code: abciTypes.ErrInternalError.Code, Log: err.Error()}
-	}
-	bytes, err := json.Marshal(result)
-	if err != nil {
-		return abciTypes.ResponseQuery{Code: abciTypes.ErrInternalError.Code, Log: err.Error()}
-	}
-	return abciTypes.ResponseQuery{Code: abciTypes.OK.Code, Value: bytes}
+func (a *EthermintApplication) Query(query abci.RequestQuery) abci.ResponseQuery {
+	/*
+		log.Info("Query")
+		var in jsonRequest
+		if err := json.Unmarshal(query.Data, &in); err != nil {
+			return abciTypes.ResponseQuery{Code: abciTypes.ErrEncodingError.Code, Log: err.Error()}
+		}
+		var result interface{}
+		if err := app.rpcClient.Call(&result, in.Method, in.Params...); err != nil {
+			return abciTypes.ResponseQuery{Code: abciTypes.ErrInternalError.Code, Log: err.Error()}
+		}
+		bytes, err := json.Marshal(result)
+		if err != nil {
+			return abciTypes.ResponseQuery{Code: abciTypes.ErrInternalError.Code, Log: err.Error()}
+		}
+		return abciTypes.ResponseQuery{Code: abciTypes.OK.Code, Value: bytes}
+	*/
+	return abci.ResponseQuery{}
 }
 
+/*
 //-------------------------------------------------------
 
 // validateTx checks the validity of a tx against the blockchain's current state.
@@ -226,3 +235,4 @@ func (app *EthermintApplication) validateTx(tx *ethTypes.Transaction) abciTypes.
 
 	return abciTypes.OK
 }
+*/
