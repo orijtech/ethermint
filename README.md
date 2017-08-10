@@ -52,7 +52,15 @@ unzip -d /usr/local/bin ${the name of the ethermint binary}.zip
 ### Docker
 We are currently building docker images for both [ethermint](https://hub.docker.com/r/adrianbrink/ethermint/) and [tendermint](https://hub.docker.com/r/adrianbrink/tendermint/). There are images for versioned releases, builds of master and builds of develop.
 
-// TODO: Add example of how to get a node up and running using docker
+* To pull the latest image
+```bash
+docker pull adrianbrink/ethermint
+```
+
+* Now run it
+```bash
+docker run -it -p 46658:46658 adrianbrink/ethermint
+```
 
 ### Source
 Ethermint builds with go1.8.3 and hence go1.8.3 needs to be installed. In order to manage your go installation we recommend [GVM](https://github.com/moovweb/gvm).
